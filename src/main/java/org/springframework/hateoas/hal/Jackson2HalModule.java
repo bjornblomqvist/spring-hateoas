@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *	  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -110,16 +110,18 @@ public class Jackson2HalModule extends SimpleModule {
 
 		private final BeanProperty property;
 		private final CurieProvider curieProvider;
+		private final HalMultipleLinkRels halMultipleLinkRels;
 
-		public HalLinkListSerializer(CurieProvider curieProvider) {
-			this(null, curieProvider);
+		public HalLinkListSerializer(CurieProvider curieProvider, HalMultipleLinkRels halMultipleLinkRels) {
+			this(null, curieProvider, halMultipleLinkRels);
 		}
 
-		public HalLinkListSerializer(BeanProperty property, CurieProvider curieProvider) {
+		public HalLinkListSerializer(BeanProperty property, CurieProvider curieProvider, HalMultipleLinkRels halMultipleLinkRels) {
 
 			super(List.class, false);
 			this.property = property;
 			this.curieProvider = curieProvider;
+			this.halMultipleLinkRels = halMultipleLinkRels;
 		}
 
 		/*
@@ -167,7 +169,7 @@ public class Jackson2HalModule extends SimpleModule {
 			JavaType mapType = typeFactory.constructMapType(HashMap.class, keyType, valueType);
 
 			MapSerializer serializer = MapSerializer.construct(new String[] {}, mapType, true, null,
-					provider.findKeySerializer(keyType, null), new OptionalListJackson2Serializer(property), null);
+					provider.findKeySerializer(keyType, null), new OptionalListJackson2Serializer(property, halMultipleLinkRels), null);
 
 			serializer.serialize(sortedLinks, jgen, provider);
 		}
@@ -179,7 +181,7 @@ public class Jackson2HalModule extends SimpleModule {
 		@Override
 		public JsonSerializer<?> createContextual(SerializerProvider provider, BeanProperty property)
 				throws JsonMappingException {
-			return new HalLinkListSerializer(property, curieProvider);
+			return new HalLinkListSerializer(property, curieProvider, halMultipleLinkRels);
 		}
 
 		/*
@@ -320,21 +322,24 @@ public class Jackson2HalModule extends SimpleModule {
 
 		private final BeanProperty property;
 		private final Map<Class<?>, JsonSerializer<Object>> serializers;
+		private final HalMultipleLinkRels halMultipleLinkRels;
 
 		public OptionalListJackson2Serializer() {
-			this(null);
+			this(null, new HalMultipleLinkRels());
 		}
 
 		/**
-		 * Creates a new {@link OptionalListJackson2Serializer} using the given {@link BeanProperty}.
-		 * 
+		 * Creates a new {@link OptionalListJackson2Serializer} using the given {@link BeanProperty} and
+		 * {@link HalMultipleLinkRels}.
+		 *
 		 * @param property
 		 */
-		public OptionalListJackson2Serializer(BeanProperty property) {
+		public OptionalListJackson2Serializer(BeanProperty property, HalMultipleLinkRels halMultipleLinkRels) {
 
 			super(List.class, false);
 			this.property = property;
 			this.serializers = new HashMap<Class<?>, JsonSerializer<Object>>();
+			this.halMultipleLinkRels = halMultipleLinkRels;
 		}
 
 		/*
@@ -361,6 +366,18 @@ public class Jackson2HalModule extends SimpleModule {
 			}
 
 			if (list.size() == 1) {
+				Object element = list.get(0);
+				if(element instanceof Link) {
+					Link link = (Link) element;
+					if(halMultipleLinkRels.getRels().contains(link.getRel())) {
+						jgen.writeStartArray();
+						serializeContents(list.iterator(), jgen, provider);
+						jgen.writeEndArray();
+
+						return;
+					}
+				}
+
 				serializeContents(list.iterator(), jgen, provider);
 				return;
 			}
@@ -443,7 +460,7 @@ public class Jackson2HalModule extends SimpleModule {
 		@Override
 		public JsonSerializer<?> createContextual(SerializerProvider provider, BeanProperty property)
 				throws JsonMappingException {
-			return new OptionalListJackson2Serializer(property);
+			return new OptionalListJackson2Serializer(property, halMultipleLinkRels);
 		}
 	}
 
@@ -598,15 +615,19 @@ public class Jackson2HalModule extends SimpleModule {
 		private final Map<Class<?>, Object> instanceMap = new HashMap<Class<?>, Object>();
 
 		public HalHandlerInstantiator(RelProvider resolver, CurieProvider curieProvider) {
-			this(resolver, curieProvider, true);
+			this(resolver, curieProvider, new HalMultipleLinkRels(), true);
 		}
 
-		public HalHandlerInstantiator(RelProvider resolver, CurieProvider curieProvider, boolean enforceEmbeddedCollections) {
+		public HalHandlerInstantiator(RelProvider resolver, CurieProvider curieProvider, HalMultipleLinkRels halMultipleLinkRels) {
+			this(resolver, curieProvider, halMultipleLinkRels, true);
+		}
+
+		public HalHandlerInstantiator(RelProvider resolver, CurieProvider curieProvider, HalMultipleLinkRels halMultipleLinkRels, boolean enforceEmbeddedCollections) {
 
 			Assert.notNull(resolver, "RelProvider must not be null!");
 			this.instanceMap.put(HalResourcesSerializer.class, new HalResourcesSerializer(resolver, curieProvider,
 					enforceEmbeddedCollections));
-			this.instanceMap.put(HalLinkListSerializer.class, new HalLinkListSerializer(curieProvider));
+			this.instanceMap.put(HalLinkListSerializer.class, new HalLinkListSerializer(curieProvider, halMultipleLinkRels));
 		}
 
 		private Object findInstance(Class<?> type) {

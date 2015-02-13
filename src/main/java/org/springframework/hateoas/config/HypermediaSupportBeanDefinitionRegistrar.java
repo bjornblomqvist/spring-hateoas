@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *	  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,6 +52,7 @@ import org.springframework.hateoas.core.DelegatingRelProvider;
 import org.springframework.hateoas.core.EvoInflectorRelProvider;
 import org.springframework.hateoas.hal.CurieProvider;
 import org.springframework.hateoas.hal.HalLinkDiscoverer;
+import org.springframework.hateoas.hal.HalMultipleLinkRels;
 import org.springframework.hateoas.hal.Jackson2HalModule;
 import org.springframework.hateoas.mvc.TypeConstrainedMappingJackson2HttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -281,11 +282,12 @@ class HypermediaSupportBeanDefinitionRegistrar implements ImportBeanDefinitionRe
 			}
 
 			CurieProvider curieProvider = getCurieProvider(beanFactory);
+			HalMultipleLinkRels halMultipleLinkRels = getHalMultipleLinkRels(beanFactory);
 			RelProvider relProvider = beanFactory.getBean(DELEGATING_REL_PROVIDER_BEAN_NAME, RelProvider.class);
 			ObjectMapper halObjectMapper = beanFactory.getBean(HAL_OBJECT_MAPPER_BEAN_NAME, ObjectMapper.class);
 
 			halObjectMapper.registerModule(new Jackson2HalModule());
-			halObjectMapper.setHandlerInstantiator(new Jackson2HalModule.HalHandlerInstantiator(relProvider, curieProvider));
+			halObjectMapper.setHandlerInstantiator(new Jackson2HalModule.HalHandlerInstantiator(relProvider, curieProvider, halMultipleLinkRels));
 
 			MappingJackson2HttpMessageConverter halConverter = new TypeConstrainedMappingJackson2HttpMessageConverter(
 					ResourceSupport.class);
@@ -303,6 +305,14 @@ class HypermediaSupportBeanDefinitionRegistrar implements ImportBeanDefinitionRe
 			try {
 				return factory.getBean(CurieProvider.class);
 			} catch (NoSuchBeanDefinitionException e) {
+				return null;
+			}
+		}
+
+		private static HalMultipleLinkRels getHalMultipleLinkRels(BeanFactory factory) {
+			try {
+				return factory.getBean(HalMultipleLinkRels.class);
+			} catch(NoSuchBeanDefinitionException e) {
 				return null;
 			}
 		}

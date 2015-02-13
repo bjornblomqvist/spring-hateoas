@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *	  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,6 +50,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class Jackson2HalIntegrationTest extends AbstractJackson2MarshallingIntegrationTest {
 
 	static final String SINGLE_LINK_REFERENCE = "{\"_links\":{\"self\":{\"href\":\"localhost\"}}}";
+	static final String SINGLE_LINK_ARRAY_REFERENCE = "{\"_links\":{\"multiple\":[{\"href\":\"localhost\"}]}}";
 	static final String LIST_LINK_REFERENCE = "{\"_links\":{\"self\":[{\"href\":\"localhost\"},{\"href\":\"localhost2\"}]}}";
 
 	static final String SIMPLE_EMBEDDED_RESOURCE_REFERENCE = "{\"_links\":{\"self\":{\"href\":\"localhost\"}},\"_embedded\":{\"content\":[\"first\",\"second\"]}}";
@@ -107,6 +108,16 @@ public class Jackson2HalIntegrationTest extends AbstractJackson2MarshallingInteg
 		resourceSupport.add(new Link("localhost2"));
 
 		assertThat(write(resourceSupport), is(LIST_LINK_REFERENCE));
+	}
+
+	@Test
+	public void rendersSingleLinkAsArrayWhenConfigured() throws Exception {
+		mapper.setHandlerInstantiator(new HalHandlerInstantiator(new AnnotationRelProvider(), null, new HalMultipleLinkRels("multiple")));
+
+		ResourceSupport resourceSupport = new ResourceSupport();
+		resourceSupport.add(new Link("localhost").withRel("multiple"));
+
+		assertThat(write(resourceSupport), is(SINGLE_LINK_ARRAY_REFERENCE));
 	}
 
 	@Test
